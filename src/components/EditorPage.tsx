@@ -230,7 +230,7 @@ export const EditorPage = () => {
             <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
               <Home className="h-5 w-5" />
             </Button>
-            <h1 className="text-xl font-bold gradient-primary bg-clip-text text-transparent">
+            <h1 className="text-xl font-bold text-foreground">
               Home Visualizer Pro
             </h1>
           </div>
