@@ -178,7 +178,7 @@ export const HomePage = () => {
           <p className="text-xl text-white/90 mb-8 max-w-2xl mx-auto">
             Start visualizing your dream colors today. No credit card required.
           </p>
-          <Button variant="hero" size="xl" onClick={() => navigate("/editor")}>
+          <Button variant="hero" size="xl" onClick={() => navigate("/editor")} className="bg-stone-800 hover:bg-stone-700 text-neutral-800">
             Get Started Now
           </Button>
         </div>
