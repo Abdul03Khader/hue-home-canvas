@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Canvas as FabricCanvas, FabricImage, Polygon, Circle, Line } from "fabric";
+import { Canvas as FabricCanvas, FabricImage, Polygon, Circle, Polyline } from "fabric";
 import { 
   Upload, 
   Mouse, 
@@ -24,7 +24,7 @@ import { LayersPanel, type Layer } from "./editor/LayersPanel";
 import { HistoryPanel, type HistoryEntry } from "./editor/HistoryPanel";
 import { supabase } from "@/integrations/supabase/client";
 
-// Popular paint colors from Asian Paints, Dulux, Berger
+// Popular paint colors from Asian Paints, Dulux, Berger, Nippon, Kansai Nerolac
 const paintColors = [
   { name: "Pure White", hex: "#FFFFFF", brand: "Asian Paints" },
   { name: "Soft Cream", hex: "#F5F5DC", brand: "Dulux" },
@@ -41,6 +41,26 @@ const paintColors = [
   { name: "Peach", hex: "#FFDAB9", brand: "Asian Paints" },
   { name: "Aqua", hex: "#00FFFF", brand: "Dulux" },
   { name: "Rose Pink", hex: "#FF66B2", brand: "Berger" },
+  { name: "Butter Yellow", hex: "#FFFACD", brand: "Nippon" },
+  { name: "Ocean Blue", hex: "#4682B4", brand: "Kansai Nerolac" },
+  { name: "Dusty Rose", hex: "#DCAE96", brand: "Asian Paints" },
+  { name: "Moss Green", hex: "#8A9A5B", brand: "Dulux" },
+  { name: "Burgundy", hex: "#800020", brand: "Berger" },
+  { name: "Ivory", hex: "#FFFFF0", brand: "Nippon" },
+  { name: "Slate Blue", hex: "#6A5ACD", brand: "Kansai Nerolac" },
+  { name: "Sandstone", hex: "#C2B280", brand: "Asian Paints" },
+  { name: "Forest Green", hex: "#228B22", brand: "Dulux" },
+  { name: "Mauve", hex: "#E0B0FF", brand: "Berger" },
+  { name: "Honey Gold", hex: "#FFA500", brand: "Nippon" },
+  { name: "Steel Gray", hex: "#71797E", brand: "Kansai Nerolac" },
+  { name: "Coral Pink", hex: "#F88379", brand: "Asian Paints" },
+  { name: "Olive Green", hex: "#808000", brand: "Dulux" },
+  { name: "Plum", hex: "#8E4585", brand: "Berger" },
+  { name: "Pearl White", hex: "#F8F6F0", brand: "Nippon" },
+  { name: "Teal", hex: "#008080", brand: "Kansai Nerolac" },
+  { name: "Mustard", hex: "#FFDB58", brand: "Asian Paints" },
+  { name: "Crimson", hex: "#DC143C", brand: "Dulux" },
+  { name: "Lilac", hex: "#C8A2C8", brand: "Berger" },
 ];
 
 export const EditorPage = () => {
@@ -51,7 +71,8 @@ export const EditorPage = () => {
   const [selectedColor, setSelectedColor] = useState(paintColors[0].hex);
   const [isDrawingPolygon, setIsDrawingPolygon] = useState(false);
   const [polygonPoints, setPolygonPoints] = useState<{ x: number; y: number }[]>([]);
-  const [polygonLines, setPolygonLines] = useState<any[]>([]);
+  const [previewPolyline, setPreviewPolyline] = useState<Polyline | null>(null);
+  const [previewCircles, setPreviewCircles] = useState<Circle[]>([]);
   const [layers, setLayers] = useState<Layer[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1);
@@ -101,27 +122,34 @@ export const EditorPage = () => {
     const pointer = fabricCanvas.getPointer(options.e);
     const newPoints = [...polygonPoints, { x: pointer.x, y: pointer.y }];
     
-    // Visual feedback - add a small circle at the point
+    // Add circle marker at point
     const circle = new Circle({
       left: pointer.x - 3,
       top: pointer.y - 3,
       radius: 3,
       fill: "red",
       selectable: false,
+      evented: false,
     });
     fabricCanvas.add(circle);
+    setPreviewCircles([...previewCircles, circle]);
 
-    // Draw line connecting to previous point
-    if (polygonPoints.length > 0) {
-      const prevPoint = polygonPoints[polygonPoints.length - 1];
-      const line = new Line([prevPoint.x, prevPoint.y, pointer.x, pointer.y], {
+    // Update or create polyline for all points
+    if (previewPolyline) {
+      fabricCanvas.remove(previewPolyline);
+    }
+    
+    if (newPoints.length > 1) {
+      const polyline = new Polyline(newPoints, {
         stroke: selectedColor,
         strokeWidth: 2,
+        fill: 'transparent',
         selectable: false,
+        evented: false,
         strokeDashArray: [5, 5],
       });
-      fabricCanvas.add(line);
-      setPolygonLines([...polygonLines, line]);
+      fabricCanvas.add(polyline);
+      setPreviewPolyline(polyline);
     }
 
     setPolygonPoints(newPoints);
@@ -170,15 +198,15 @@ export const EditorPage = () => {
     };
     setLayers([...layers, newLayer]);
     
-    // Clear polygon points, circles, and lines
-    fabricCanvas.getObjects().forEach(obj => {
-      if ((obj.type === 'circle' && obj.get('radius') === 3) || polygonLines.includes(obj)) {
-        fabricCanvas.remove(obj);
-      }
-    });
+    // Clear preview objects efficiently
+    if (previewPolyline) {
+      fabricCanvas.remove(previewPolyline);
+      setPreviewPolyline(null);
+    }
+    previewCircles.forEach(circle => fabricCanvas.remove(circle));
+    setPreviewCircles([]);
     
     setPolygonPoints([]);
-    setPolygonLines([]);
     setIsDrawingPolygon(false);
     addToHistory(`Created ${newLayer.name}`);
     toast.success("Area selected! Color applied.");
@@ -508,13 +536,14 @@ export const EditorPage = () => {
                     size="sm" 
                     variant="outline" 
                     onClick={() => {
+                      if (previewPolyline && fabricCanvas) {
+                        fabricCanvas.remove(previewPolyline);
+                        setPreviewPolyline(null);
+                      }
+                      previewCircles.forEach(circle => fabricCanvas?.remove(circle));
+                      setPreviewCircles([]);
                       setPolygonPoints([]);
                       setIsDrawingPolygon(false);
-                      fabricCanvas?.getObjects().forEach(obj => {
-                        if (obj.type === 'circle' && obj.get('radius') === 3) {
-                          fabricCanvas.remove(obj);
-                        }
-                      });
                     }}
                   >
                     Cancel
