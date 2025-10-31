@@ -15,7 +15,7 @@ export const HomePage = () => {
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 glass-card border-b border-white/10">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <h1 className="text-xl font-bold gradient-primary bg-clip-text text-transparent">
+          <h1 className="text-xl font-bold text-gradient">
             Home Visualizer Pro
           </h1>
           <div className="flex gap-3">
@@ -199,7 +199,7 @@ export const HomePage = () => {
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div>
-              <h3 className="font-bold text-lg mb-4 gradient-primary bg-clip-text text-transparent">
+              <h3 className="font-bold text-lg mb-4 text-gradient">
                 Home Visualizer Pro
               </h3>
               <p className="text-sm text-muted-foreground">
