@@ -534,7 +534,7 @@ export const EditorPage = () => {
             {isDrawingPolygon && polygonPoints.length > 0 && <div className="mb-4 flex gap-2 items-center">
                 <Card className="p-3 flex gap-2 items-center animate-fade-in">
                   <span className="text-sm">Points: {polygonPoints.length}</span>
-                  <Button size="sm" variant="hero" onClick={completePolygon}>
+                  <Button size="sm" variant="hero" onClick={completePolygon} className="text-zinc-900">
                     Complete Selection
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => {
