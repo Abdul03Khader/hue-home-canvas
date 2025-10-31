@@ -19,7 +19,7 @@ export const HomePage = () => {
             <Button variant="ghost" onClick={() => navigate("/auth")}>
               Login
             </Button>
-            <Button variant="hero" onClick={() => navigate("/auth")}>
+            <Button variant="hero" onClick={() => navigate("/auth")} className="text-slate-900">
               Sign Up
             </Button>
           </div>
