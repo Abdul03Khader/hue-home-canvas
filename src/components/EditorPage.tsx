@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Canvas as FabricCanvas, FabricImage, Polygon, Circle } from "fabric";
+import { Canvas as FabricCanvas, FabricImage, Polygon, Circle, Line } from "fabric";
 import { 
   Upload, 
   Mouse, 
@@ -15,10 +15,14 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
-  Palette
+  Palette,
+  Layers
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { LayersPanel, type Layer } from "./editor/LayersPanel";
+import { HistoryPanel, type HistoryEntry } from "./editor/HistoryPanel";
+import { supabase } from "@/integrations/supabase/client";
 
 // Popular paint colors from Asian Paints, Dulux, Berger
 const paintColors = [
@@ -47,6 +51,11 @@ export const EditorPage = () => {
   const [selectedColor, setSelectedColor] = useState(paintColors[0].hex);
   const [isDrawingPolygon, setIsDrawingPolygon] = useState(false);
   const [polygonPoints, setPolygonPoints] = useState<{ x: number; y: number }[]>([]);
+  const [polygonLines, setPolygonLines] = useState<any[]>([]);
+  const [layers, setLayers] = useState<Layer[]>([]);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1);
+  const [currentDesignId, setCurrentDesignId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -91,8 +100,7 @@ export const EditorPage = () => {
 
     const pointer = fabricCanvas.getPointer(options.e);
     const newPoints = [...polygonPoints, { x: pointer.x, y: pointer.y }];
-    setPolygonPoints(newPoints);
-
+    
     // Visual feedback - add a small circle at the point
     const circle = new Circle({
       left: pointer.x - 3,
@@ -102,6 +110,37 @@ export const EditorPage = () => {
       selectable: false,
     });
     fabricCanvas.add(circle);
+
+    // Draw line connecting to previous point
+    if (polygonPoints.length > 0) {
+      const prevPoint = polygonPoints[polygonPoints.length - 1];
+      const line = new Line([prevPoint.x, prevPoint.y, pointer.x, pointer.y], {
+        stroke: selectedColor,
+        strokeWidth: 2,
+        selectable: false,
+        strokeDashArray: [5, 5],
+      });
+      fabricCanvas.add(line);
+      setPolygonLines([...polygonLines, line]);
+    }
+
+    setPolygonPoints(newPoints);
+  };
+
+  const addToHistory = (action: string) => {
+    if (!fabricCanvas) return;
+    
+    const newEntry: HistoryEntry = {
+      id: Date.now().toString(),
+      action,
+      timestamp: new Date(),
+      canvasData: fabricCanvas.toJSON(),
+    };
+
+    const newHistory = history.slice(0, currentHistoryIndex + 1);
+    newHistory.push(newEntry);
+    setHistory(newHistory);
+    setCurrentHistoryIndex(newHistory.length - 1);
   };
 
   const completePolygon = () => {
@@ -117,17 +156,31 @@ export const EditorPage = () => {
       strokeWidth: 2,
     });
 
+    const layerId = Date.now().toString();
+    polygon.set('layerId', layerId);
     fabricCanvas.add(polygon);
     
-    // Clear polygon points and circles
+    // Add to layers
+    const newLayer: Layer = {
+      id: layerId,
+      name: `Selection ${layers.length + 1}`,
+      color: selectedColor,
+      visible: true,
+      fabricObject: polygon,
+    };
+    setLayers([...layers, newLayer]);
+    
+    // Clear polygon points, circles, and lines
     fabricCanvas.getObjects().forEach(obj => {
-      if (obj.type === 'circle' && obj.get('radius') === 3) {
+      if ((obj.type === 'circle' && obj.get('radius') === 3) || polygonLines.includes(obj)) {
         fabricCanvas.remove(obj);
       }
     });
     
     setPolygonPoints([]);
+    setPolygonLines([]);
     setIsDrawingPolygon(false);
+    addToHistory(`Created ${newLayer.name}`);
     toast.success("Area selected! Color applied.");
   };
 
@@ -161,12 +214,63 @@ export const EditorPage = () => {
     reader.readAsDataURL(file);
   };
 
-  const handleUndo = () => {
+  const handleDeleteLayer = (layerId: string) => {
     if (!fabricCanvas) return;
-    const objects = fabricCanvas.getObjects();
-    if (objects.length > 0) {
-      fabricCanvas.remove(objects[objects.length - 1]);
-      toast.success("Undone");
+    
+    const layer = layers.find(l => l.id === layerId);
+    if (layer && layer.fabricObject) {
+      fabricCanvas.remove(layer.fabricObject);
+      setLayers(layers.filter(l => l.id !== layerId));
+      addToHistory(`Deleted ${layer.name}`);
+      toast.success("Layer deleted");
+    }
+  };
+
+  const handleToggleVisibility = (layerId: string) => {
+    if (!fabricCanvas) return;
+    
+    const layer = layers.find(l => l.id === layerId);
+    if (layer && layer.fabricObject) {
+      layer.fabricObject.visible = !layer.visible;
+      layer.visible = !layer.visible;
+      setLayers([...layers]);
+      fabricCanvas.renderAll();
+    }
+  };
+
+  const handleRestoreHistory = (index: number) => {
+    if (!fabricCanvas || !history[index]) return;
+    
+    fabricCanvas.loadFromJSON(history[index].canvasData, () => {
+      fabricCanvas.renderAll();
+      setCurrentHistoryIndex(index);
+      // Rebuild layers from canvas objects
+      const newLayers: Layer[] = [];
+      fabricCanvas.getObjects().forEach(obj => {
+        if (obj.get('layerId')) {
+          newLayers.push({
+            id: obj.get('layerId') as string,
+            name: `Selection ${newLayers.length + 1}`,
+            color: obj.get('fill') as string || selectedColor,
+            visible: obj.visible || true,
+            fabricObject: obj,
+          });
+        }
+      });
+      setLayers(newLayers);
+      toast.success("History restored");
+    });
+  };
+
+  const handleUndo = () => {
+    if (currentHistoryIndex > 0) {
+      handleRestoreHistory(currentHistoryIndex - 1);
+    }
+  };
+
+  const handleRedo = () => {
+    if (currentHistoryIndex < history.length - 1) {
+      handleRestoreHistory(currentHistoryIndex + 1);
     }
   };
 
@@ -206,19 +310,75 @@ export const EditorPage = () => {
     toast.success("Design downloaded!");
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!fabricCanvas) return;
     
     const json = fabricCanvas.toJSON();
-    const designs = JSON.parse(localStorage.getItem("visualizer_designs") || "[]");
-    designs.push({
-      id: Date.now(),
-      data: json,
-      createdAt: new Date().toISOString(),
-    });
-    localStorage.setItem("visualizer_designs", JSON.stringify(designs));
+    const { data: { user } } = await supabase.auth.getUser();
     
-    toast.success("Design saved!");
+    if (!user) {
+      // Fallback to localStorage for guest users
+      const designs = JSON.parse(localStorage.getItem("visualizer_designs") || "[]");
+      designs.push({
+        id: Date.now(),
+        data: json,
+        createdAt: new Date().toISOString(),
+      });
+      localStorage.setItem("visualizer_designs", JSON.stringify(designs));
+      toast.success("Design saved locally!");
+      return;
+    }
+
+    try {
+      if (currentDesignId) {
+        // Update existing design
+        const { error } = await supabase
+          .from("designs")
+          .update({
+            canvas_data: json,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", currentDesignId);
+
+        if (error) throw error;
+        
+        // Save to history
+        await supabase.from("design_history").insert({
+          design_id: currentDesignId,
+          canvas_data: json,
+          action_type: "update",
+        });
+        
+        toast.success("Design updated!");
+      } else {
+        // Create new design
+        const { data, error } = await supabase
+          .from("designs")
+          .insert({
+            user_id: user.id,
+            canvas_data: json,
+            name: `Design ${new Date().toLocaleDateString()}`,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        
+        setCurrentDesignId(data.id);
+        
+        // Save initial history
+        await supabase.from("design_history").insert({
+          design_id: data.id,
+          canvas_data: json,
+          action_type: "create",
+        });
+        
+        toast.success("Design saved to database!");
+      }
+    } catch (error) {
+      console.error("Save error:", error);
+      toast.error("Failed to save design");
+    }
   };
 
   return (
@@ -313,8 +473,24 @@ export const EditorPage = () => {
             <RotateCcw className="h-5 w-5" />
           </Button>
 
-          <Button variant="ghost" size="icon" onClick={handleUndo} title="Undo">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={handleUndo} 
+            title="Undo"
+            disabled={currentHistoryIndex <= 0}
+          >
             <Undo2 className="h-5 w-5" />
+          </Button>
+
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={handleRedo} 
+            title="Redo"
+            disabled={currentHistoryIndex >= history.length - 1}
+          >
+            <Redo2 className="h-5 w-5" />
           </Button>
         </aside>
 
@@ -353,38 +529,52 @@ export const EditorPage = () => {
           </div>
         </main>
 
-        {/* Right Color Palette */}
-        <aside className="w-80 border-l border-border bg-card p-6">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <Palette className="h-5 w-5 text-primary" />
-            Paint Colors
-          </h2>
+        {/* Right Sidebar - Color Palette & Layers */}
+        <aside className="w-80 border-l border-border bg-card p-6 flex flex-col gap-4">
+          <div>
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Palette className="h-5 w-5 text-primary" />
+              Paint Colors
+            </h2>
           
-          <ScrollArea className="h-[calc(100vh-12rem)]">
-            <div className="space-y-2">
-              {paintColors.map((color) => (
-                <button
-                  key={color.hex}
-                  onClick={() => setSelectedColor(color.hex)}
-                  className={`w-full p-3 rounded-lg border-2 transition-smooth hover:scale-105 flex items-center gap-3 ${
-                    selectedColor === color.hex 
-                      ? "border-primary shadow-glow" 
-                      : "border-border hover:border-primary/50"
-                  }`}
-                >
-                  <div 
-                    className="w-10 h-10 rounded-md shadow-md border border-border"
-                    style={{ backgroundColor: color.hex }}
-                  />
-                  <div className="text-left flex-1">
-                    <div className="font-medium text-sm">{color.name}</div>
-                    <div className="text-xs text-muted-foreground">{color.brand}</div>
-                    <div className="text-xs text-muted-foreground font-mono">{color.hex}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </ScrollArea>
+            <ScrollArea className="h-[300px]">
+              <div className="space-y-2">
+                {paintColors.map((color) => (
+                  <button
+                    key={color.hex}
+                    onClick={() => setSelectedColor(color.hex)}
+                    className={`w-full p-3 rounded-lg border-2 transition-smooth hover:scale-105 flex items-center gap-3 ${
+                      selectedColor === color.hex 
+                        ? "border-primary shadow-glow" 
+                        : "border-border hover:border-primary/50"
+                    }`}
+                  >
+                    <div 
+                      className="w-10 h-10 rounded-md shadow-md border border-border"
+                      style={{ backgroundColor: color.hex }}
+                    />
+                    <div className="text-left flex-1">
+                      <div className="font-medium text-sm">{color.name}</div>
+                      <div className="text-xs text-muted-foreground">{color.brand}</div>
+                      <div className="text-xs text-muted-foreground font-mono">{color.hex}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+
+          <LayersPanel
+            layers={layers}
+            onDeleteLayer={handleDeleteLayer}
+            onToggleVisibility={handleToggleVisibility}
+          />
+
+          <HistoryPanel
+            history={history}
+            currentIndex={currentHistoryIndex}
+            onRestore={handleRestoreHistory}
+          />
         </aside>
       </div>
     </div>

@@ -14,7 +14,68 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      design_history: {
+        Row: {
+          action_type: string
+          canvas_data: Json
+          created_at: string
+          design_id: string
+          id: string
+        }
+        Insert: {
+          action_type: string
+          canvas_data: Json
+          created_at?: string
+          design_id: string
+          id?: string
+        }
+        Update: {
+          action_type?: string
+          canvas_data?: Json
+          created_at?: string
+          design_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "design_history_design_id_fkey"
+            columns: ["design_id"]
+            isOneToOne: false
+            referencedRelation: "designs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      designs: {
+        Row: {
+          canvas_data: Json
+          created_at: string
+          id: string
+          name: string
+          thumbnail_url: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          canvas_data: Json
+          created_at?: string
+          id?: string
+          name?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          canvas_data?: Json
+          created_at?: string
+          id?: string
+          name?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
