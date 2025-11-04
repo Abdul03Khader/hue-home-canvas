@@ -9,155 +9,28 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { LayersPanel, type Layer } from "./editor/LayersPanel";
 import { HistoryPanel, type HistoryEntry } from "./editor/HistoryPanel";
 import { supabase } from "@/integrations/supabase/client";
+import { colors } from "@/data/colors";
 
-// Popular paint colors from Asian Paints, Dulux, Berger, Nippon, Kansai Nerolac
-const paintColors = [{
-  name: "Pure White",
-  hex: "#FFFFFF",
-  brand: "Asian Paints"
-}, {
-  name: "Soft Cream",
-  hex: "#F5F5DC",
-  brand: "Dulux"
-}, {
-  name: "Warm Beige",
-  hex: "#D4C5B9",
-  brand: "Berger"
-}, {
-  name: "Sky Blue",
-  hex: "#87CEEB",
-  brand: "Asian Paints"
-}, {
-  name: "Mint Green",
-  hex: "#98D8C8",
-  brand: "Dulux"
-}, {
-  name: "Coral Blush",
-  hex: "#FF7F50",
-  brand: "Berger"
-}, {
-  name: "Lavender",
-  hex: "#E6E6FA",
-  brand: "Asian Paints"
-}, {
-  name: "Sunshine Yellow",
-  hex: "#FFD700",
-  brand: "Dulux"
-}, {
-  name: "Terracotta",
-  hex: "#E2725B",
-  brand: "Berger"
-}, {
-  name: "Sage Green",
-  hex: "#9CAF88",
-  brand: "Asian Paints"
-}, {
-  name: "Navy Blue",
-  hex: "#001F3F",
-  brand: "Dulux"
-}, {
-  name: "Charcoal Gray",
-  hex: "#36454F",
-  brand: "Berger"
-}, {
-  name: "Peach",
-  hex: "#FFDAB9",
-  brand: "Asian Paints"
-}, {
-  name: "Aqua",
-  hex: "#00FFFF",
-  brand: "Dulux"
-}, {
-  name: "Rose Pink",
-  hex: "#FF66B2",
-  brand: "Berger"
-}, {
-  name: "Butter Yellow",
-  hex: "#FFFACD",
-  brand: "Nippon"
-}, {
-  name: "Ocean Blue",
-  hex: "#4682B4",
-  brand: "Kansai Nerolac"
-}, {
-  name: "Dusty Rose",
-  hex: "#DCAE96",
-  brand: "Asian Paints"
-}, {
-  name: "Moss Green",
-  hex: "#8A9A5B",
-  brand: "Dulux"
-}, {
-  name: "Burgundy",
-  hex: "#800020",
-  brand: "Berger"
-}, {
-  name: "Ivory",
-  hex: "#FFFFF0",
-  brand: "Nippon"
-}, {
-  name: "Slate Blue",
-  hex: "#6A5ACD",
-  brand: "Kansai Nerolac"
-}, {
-  name: "Sandstone",
-  hex: "#C2B280",
-  brand: "Asian Paints"
-}, {
-  name: "Forest Green",
-  hex: "#228B22",
-  brand: "Dulux"
-}, {
-  name: "Mauve",
-  hex: "#E0B0FF",
-  brand: "Berger"
-}, {
-  name: "Honey Gold",
-  hex: "#FFA500",
-  brand: "Nippon"
-}, {
-  name: "Steel Gray",
-  hex: "#71797E",
-  brand: "Kansai Nerolac"
-}, {
-  name: "Coral Pink",
-  hex: "#FF6B9D",
-  brand: "Asian Paints"
-}, {
-  name: "Olive Green",
-  hex: "#808000",
-  brand: "Dulux"
-}, {
-  name: "Plum",
-  hex: "#8E4585",
-  brand: "Berger"
-}, {
-  name: "Pearl White",
-  hex: "#F8F6F0",
-  brand: "Nippon"
-}, {
-  name: "Teal",
-  hex: "#008080",
-  brand: "Kansai Nerolac"
-}, {
-  name: "Mustard",
-  hex: "#FFDB58",
-  brand: "Asian Paints"
-}, {
-  name: "Crimson",
-  hex: "#DC143C",
-  brand: "Dulux"
-}, {
-  name: "Lilac",
-  hex: "#C8A2C8",
-  brand: "Berger"
-}];
+// Convert RGB string to hex
+const rgbToHex = (rgb: string): string => {
+  const matches = rgb.match(/\d+/g);
+  if (!matches || matches.length !== 3) return "#000000";
+  
+  const r = parseInt(matches[0]);
+  const g = parseInt(matches[1]);
+  const b = parseInt(matches[2]);
+  
+  return "#" + [r, g, b].map(x => {
+    const hex = x.toString(16);
+    return hex.length === 1 ? "0" + hex : hex;
+  }).join("");
+};
 export const EditorPage = () => {
   const navigate = useNavigate();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
   const [activeTool, setActiveTool] = useState<"select" | "polygon" | "brush">("select");
-  const [selectedColor, setSelectedColor] = useState(paintColors[0].hex);
+  const [selectedColor, setSelectedColor] = useState(rgbToHex(colors[0].colorValue));
   const [isDrawingPolygon, setIsDrawingPolygon] = useState(false);
   const [polygonPoints, setPolygonPoints] = useState<{
     x: number;
@@ -563,21 +436,31 @@ export const EditorPage = () => {
           <div>
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <Palette className="h-5 w-5 text-primary" />
-              Paint Colors
+              All Colors
             </h2>
           
             <ScrollArea className="h-[300px]">
               <div className="space-y-2">
-                {paintColors.map(color => <button key={color.hex} onClick={() => setSelectedColor(color.hex)} className={`w-full p-3 rounded-lg border-2 transition-smooth hover:scale-105 flex items-center gap-3 ${selectedColor === color.hex ? "border-primary shadow-glow" : "border-border hover:border-primary/50"}`}>
-                    <div className="w-10 h-10 rounded-md shadow-md border border-border" style={{
-                  backgroundColor: color.hex
-                }} />
-                    <div className="text-left flex-1">
-                      <div className="font-medium text-sm">{color.name}</div>
-                      <div className="text-xs text-muted-foreground">{color.brand}</div>
-                      <div className="text-xs text-muted-foreground font-mono">{color.hex}</div>
-                    </div>
-                  </button>)}
+                {colors.map((color, index) => {
+                  const hexColor = rgbToHex(color.colorValue);
+                  return (
+                    <button 
+                      key={`${color.colorCode}-${index}`} 
+                      onClick={() => setSelectedColor(hexColor)} 
+                      className={`w-full p-3 rounded-lg border-2 transition-smooth hover:scale-105 flex items-center gap-3 ${selectedColor === hexColor ? "border-primary shadow-glow" : "border-border hover:border-primary/50"}`}
+                    >
+                      <div 
+                        className="w-10 h-10 rounded-md shadow-md border border-border" 
+                        style={{ backgroundColor: hexColor }} 
+                      />
+                      <div className="text-left flex-1">
+                        <div className="font-medium text-sm">{color.colorName}</div>
+                        <div className="text-xs text-muted-foreground">{color.colorCode}</div>
+                        <div className="text-xs text-muted-foreground">{color.colorTone}</div>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </ScrollArea>
           </div>
