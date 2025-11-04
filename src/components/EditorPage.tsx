@@ -417,24 +417,27 @@ export const EditorPage = () => {
       toast.error("Failed to save design");
     }
   };
-  return <div className="min-h-screen bg-background">
+  return <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-background">
       {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+      <header className="border-b border-border/50 bg-card/80 backdrop-blur-sm sticky top-0 z-50">
+        <div className="container mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
+            <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="hover:bg-primary/10 hover:text-primary transition-smooth">
               <Home className="h-5 w-5" />
             </Button>
-            <h1 className="text-xl font-bold text-foreground">
-              Home Visualizer Pro
-            </h1>
+            <div>
+              <h1 className="text-xl font-bold text-gradient">
+                Home Visualizer Pro
+              </h1>
+              <p className="text-xs text-muted-foreground">Smart edge detection • Precision coloring</p>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleSave}>
-              <Save className="h-4 w-4 mr-2" />
+          <div className="flex gap-3">
+            <Button variant="outline" size="sm" onClick={handleSave} className="hover:border-primary/50 transition-smooth group">
+              <Save className="h-4 w-4 mr-2 group-hover:text-primary transition-smooth" />
               Save
             </Button>
-            <Button variant="hero" size="sm" onClick={handleDownload} className="text-slate-900">
+            <Button variant="default" size="sm" onClick={handleDownload} className="bg-primary hover:bg-primary-glow shadow-glow transition-smooth">
               <Download className="h-4 w-4 mr-2" />
               Download
             </Button>
@@ -444,110 +447,182 @@ export const EditorPage = () => {
 
       <div className="flex h-[calc(100vh-4rem)]">
         {/* Left Toolbar */}
-        <aside className="w-20 border-r border-border bg-card flex flex-col items-center py-6 gap-4">
+        <aside className="w-20 border-r border-border/50 bg-card/50 backdrop-blur-sm flex flex-col items-center py-6 gap-3">
           <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-          <Button variant={activeTool === "select" ? "default" : "ghost"} size="icon" onClick={() => {
-          setActiveTool("select");
-          fileInputRef.current?.click();
-        }} title="Upload Image">
-            <Upload className="h-5 w-5" />
-          </Button>
           
-          <Button variant={activeTool === "select" ? "default" : "ghost"} size="icon" onClick={() => setActiveTool("select")} title="Select Mode">
-            <Mouse className="h-5 w-5" />
-          </Button>
+          <div className="flex flex-col gap-2 pb-3 border-b border-border/50 w-full items-center">
+            <Button 
+              variant={activeTool === "select" ? "default" : "ghost"} 
+              size="icon" 
+              onClick={() => {
+                setActiveTool("select");
+                fileInputRef.current?.click();
+              }} 
+              title="Upload Image"
+              className="transition-smooth hover:scale-110 hover-scale relative group"
+            >
+              <Upload className="h-5 w-5" />
+              <span className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded opacity-0 group-hover:opacity-100 transition-smooth whitespace-nowrap pointer-events-none">
+                Upload Image
+              </span>
+            </Button>
+          </div>
+          
+          <div className="flex flex-col gap-2 pb-3 border-b border-border/50 w-full items-center">
+            <Button 
+              variant={activeTool === "select" ? "default" : "ghost"} 
+              size="icon" 
+              onClick={() => setActiveTool("select")} 
+              title="Select Mode"
+              className="transition-smooth hover:scale-110 relative group"
+            >
+              <Mouse className="h-5 w-5" />
+              <span className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded opacity-0 group-hover:opacity-100 transition-smooth whitespace-nowrap pointer-events-none">
+                Select
+              </span>
+            </Button>
 
-          <Button variant={activeTool === "polygon" ? "default" : "ghost"} size="icon" onClick={() => {
-          setActiveTool("polygon");
-          setIsDrawingPolygon(true);
-        }} title="Polygon Selection">
-            <Palette className="h-5 w-5" />
-          </Button>
+            <Button 
+              variant={activeTool === "polygon" ? "default" : "ghost"} 
+              size="icon" 
+              onClick={() => {
+                setActiveTool("polygon");
+                setIsDrawingPolygon(true);
+              }} 
+              title="Polygon Selection"
+              className="transition-smooth hover:scale-110 relative group"
+            >
+              <Palette className="h-5 w-5" />
+              <span className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded opacity-0 group-hover:opacity-100 transition-smooth whitespace-nowrap pointer-events-none">
+                Polygon Tool
+              </span>
+            </Button>
 
-          <Button variant={activeTool === "brush" ? "default" : "ghost"} size="icon" onClick={() => setActiveTool("brush")} title="Brush Tool">
-            <Brush className="h-5 w-5" />
-          </Button>
+            <Button 
+              variant={activeTool === "brush" ? "default" : "ghost"} 
+              size="icon" 
+              onClick={() => setActiveTool("brush")} 
+              title="Brush Tool"
+              className="transition-smooth hover:scale-110 relative group"
+            >
+              <Brush className="h-5 w-5" />
+              <span className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded opacity-0 group-hover:opacity-100 transition-smooth whitespace-nowrap pointer-events-none">
+                Brush
+              </span>
+            </Button>
+          </div>
 
-          <div className="border-t border-border w-full my-2" />
+          <div className="flex flex-col gap-2 flex-1">
+            <Button variant="ghost" size="icon" onClick={handleZoomIn} title="Zoom In" className="transition-smooth hover:scale-110 hover:bg-primary/10 hover:text-primary">
+              <ZoomIn className="h-5 w-5" />
+            </Button>
 
-          <Button variant="ghost" size="icon" onClick={handleZoomIn} title="Zoom In">
-            <ZoomIn className="h-5 w-5" />
-          </Button>
+            <Button variant="ghost" size="icon" onClick={handleZoomOut} title="Zoom Out" className="transition-smooth hover:scale-110 hover:bg-primary/10 hover:text-primary">
+              <ZoomOut className="h-5 w-5" />
+            </Button>
 
-          <Button variant="ghost" size="icon" onClick={handleZoomOut} title="Zoom Out">
-            <ZoomOut className="h-5 w-5" />
-          </Button>
+            <Button variant="ghost" size="icon" onClick={handleReset} title="Reset View" className="transition-smooth hover:scale-110 hover:bg-primary/10 hover:text-primary">
+              <RotateCcw className="h-5 w-5" />
+            </Button>
+          </div>
 
-          <Button variant="ghost" size="icon" onClick={handleReset} title="Reset View">
-            <RotateCcw className="h-5 w-5" />
-          </Button>
+          <div className="flex flex-col gap-2 pt-3 border-t border-border/50 w-full items-center">
+            <Button variant="ghost" size="icon" onClick={handleUndo} title="Undo" disabled={currentHistoryIndex <= 0} className="transition-smooth hover:scale-110 disabled:opacity-30">
+              <Undo2 className="h-5 w-5" />
+            </Button>
 
-          <Button variant="ghost" size="icon" onClick={handleUndo} title="Undo" disabled={currentHistoryIndex <= 0}>
-            <Undo2 className="h-5 w-5" />
-          </Button>
-
-          <Button variant="ghost" size="icon" onClick={handleRedo} title="Redo" disabled={currentHistoryIndex >= history.length - 1}>
-            <Redo2 className="h-5 w-5" />
-          </Button>
+            <Button variant="ghost" size="icon" onClick={handleRedo} title="Redo" disabled={currentHistoryIndex >= history.length - 1} className="transition-smooth hover:scale-110 disabled:opacity-30">
+              <Redo2 className="h-5 w-5" />
+            </Button>
+          </div>
         </aside>
 
         {/* Main Canvas */}
-        <main className="flex-1 p-6 overflow-auto">
+        <main className="flex-1 p-8 overflow-auto">
           <div className="max-w-6xl mx-auto">
-            {isDrawingPolygon && polygonPoints.length > 0 && <div className="mb-4 flex gap-2 items-center">
-                <Card className="p-3 flex gap-2 items-center animate-fade-in">
-                  <span className="text-sm">Points: {polygonPoints.length}</span>
-                  <Button size="sm" variant="hero" onClick={completePolygon} className="text-zinc-900">
+            {isDrawingPolygon && polygonPoints.length > 0 && (
+              <div className="mb-6 flex gap-3 items-center animate-fade-in">
+                <Card className="p-4 flex gap-3 items-center bg-card/80 backdrop-blur-sm border-primary/20 shadow-glow">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-primary animate-glow-pulse" />
+                    <span className="text-sm font-medium">Points: <span className="text-primary">{polygonPoints.length}</span></span>
+                  </div>
+                  <Button 
+                    size="sm" 
+                    onClick={completePolygon} 
+                    className="bg-primary hover:bg-primary-glow transition-smooth shadow-glow"
+                  >
                     Complete Selection
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => {
-                if (previewPolyline && fabricCanvas) {
-                  fabricCanvas.remove(previewPolyline);
-                  setPreviewPolyline(null);
-                }
-                previewCircles.forEach(circle => fabricCanvas?.remove(circle));
-                setPreviewCircles([]);
-                setPolygonPoints([]);
-                setIsDrawingPolygon(false);
-              }}>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => {
+                      if (previewPolyline && fabricCanvas) {
+                        fabricCanvas.remove(previewPolyline);
+                        setPreviewPolyline(null);
+                      }
+                      previewCircles.forEach(circle => fabricCanvas?.remove(circle));
+                      setPreviewCircles([]);
+                      setPolygonPoints([]);
+                      setIsDrawingPolygon(false);
+                    }}
+                    className="hover:bg-destructive/10 hover:border-destructive/50 hover:text-destructive transition-smooth"
+                  >
                     Cancel
                   </Button>
                 </Card>
-              </div>}
+              </div>
+            )}
             
-            <div className="bg-white rounded-lg shadow-2xl overflow-hidden border-2 border-border">
-              <canvas ref={canvasRef} />
+            <div className="rounded-xl shadow-2xl overflow-hidden border border-border/50 bg-gradient-to-br from-card to-muted/20 p-4">
+              <div className="bg-background/50 backdrop-blur-sm rounded-lg overflow-hidden border border-border/30">
+                <canvas ref={canvasRef} />
+              </div>
             </div>
           </div>
         </main>
 
         {/* Right Sidebar - Color Palette & Layers */}
-        <aside className="w-80 border-l border-border bg-card p-6 flex flex-col gap-4">
-          <div>
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Palette className="h-5 w-5 text-primary" />
-              All Colors
-            </h2>
+        <aside className="w-80 border-l border-border/50 bg-card/50 backdrop-blur-sm p-6 flex flex-col gap-6 overflow-hidden">
+          <div className="flex-1 flex flex-col min-h-0">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2 mb-2">
+                <Palette className="h-5 w-5 text-primary" />
+                <span className="text-gradient">All Colors</span>
+              </h2>
+              <p className="text-xs text-muted-foreground">Select a color to apply</p>
+            </div>
           
-            <ScrollArea className="h-[300px]">
-              <div className="space-y-2">
+            <ScrollArea className="flex-1">
+              <div className="space-y-2 pr-4">
                 {colors.map((color, index) => {
                   const hexColor = rgbToHex(color.colorValue);
+                  const isSelected = selectedColor === hexColor;
                   return (
                     <button 
                       key={`${color.colorCode}-${index}`} 
                       onClick={() => setSelectedColor(hexColor)} 
-                      className={`w-full p-3 rounded-lg border-2 transition-smooth hover:scale-105 flex items-center gap-3 ${selectedColor === hexColor ? "border-primary shadow-glow" : "border-border hover:border-primary/50"}`}
+                      className={`w-full p-3 rounded-lg border transition-smooth hover:scale-[1.02] flex items-center gap-3 group ${
+                        isSelected 
+                          ? "border-primary bg-primary/5 shadow-glow" 
+                          : "border-border/50 hover:border-primary/50 hover:bg-muted/30"
+                      }`}
                     >
                       <div 
-                        className="w-10 h-10 rounded-md shadow-md border border-border" 
+                        className="w-12 h-12 rounded-md shadow-md border-2 border-border/30 transition-smooth group-hover:scale-110" 
                         style={{ backgroundColor: hexColor }} 
                       />
-                      <div className="text-left flex-1">
-                        <div className="font-medium text-sm">{color.colorName}</div>
-                        <div className="text-xs text-muted-foreground">{color.colorCode}</div>
-                        <div className="text-xs text-muted-foreground">{color.colorTone}</div>
+                      <div className="text-left flex-1 min-w-0">
+                        <div className={`font-medium text-sm truncate ${isSelected ? 'text-primary' : ''}`}>
+                          {color.colorName}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">{color.colorCode}</div>
+                        <div className="text-xs text-muted-foreground/70 truncate">{color.colorTone}</div>
                       </div>
+                      {isSelected && (
+                        <div className="w-2 h-2 rounded-full bg-primary animate-glow-pulse flex-shrink-0" />
+                      )}
                     </button>
                   );
                 })}
