@@ -25,6 +25,65 @@ const rgbToHex = (rgb: string): string => {
     return hex.length === 1 ? "0" + hex : hex;
   }).join("");
 };
+
+// Edge detection helper functions
+const detectEdges = (imageData: ImageData): boolean[][] => {
+  const { width, height, data } = imageData;
+  const edges: boolean[][] = Array(height).fill(0).map(() => Array(width).fill(false));
+  const threshold = 30;
+
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const idx = (y * width + x) * 4;
+      
+      const gx = 
+        -1 * data[((y - 1) * width + (x - 1)) * 4] + 
+        1 * data[((y - 1) * width + (x + 1)) * 4] +
+        -2 * data[(y * width + (x - 1)) * 4] + 
+        2 * data[(y * width + (x + 1)) * 4] +
+        -1 * data[((y + 1) * width + (x - 1)) * 4] + 
+        1 * data[((y + 1) * width + (x + 1)) * 4];
+      
+      const gy = 
+        -1 * data[((y - 1) * width + (x - 1)) * 4] + 
+        -2 * data[((y - 1) * width + x) * 4] +
+        -1 * data[((y - 1) * width + (x + 1)) * 4] +
+        1 * data[((y + 1) * width + (x - 1)) * 4] + 
+        2 * data[((y + 1) * width + x) * 4] +
+        1 * data[((y + 1) * width + (x + 1)) * 4];
+      
+      const magnitude = Math.sqrt(gx * gx + gy * gy);
+      edges[y][x] = magnitude > threshold;
+    }
+  }
+  
+  return edges;
+};
+
+const findNearestEdge = (x: number, y: number, edges: boolean[][], searchRadius: number = 15): { x: number; y: number } | null => {
+  const height = edges.length;
+  const width = edges[0]?.length || 0;
+  
+  let minDist = searchRadius;
+  let nearestPoint: { x: number; y: number } | null = null;
+  
+  for (let dy = -searchRadius; dy <= searchRadius; dy++) {
+    for (let dx = -searchRadius; dx <= searchRadius; dx++) {
+      const checkY = Math.floor(y + dy);
+      const checkX = Math.floor(x + dx);
+      
+      if (checkY >= 0 && checkY < height && checkX >= 0 && checkX < width && edges[checkY][checkX]) {
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < minDist) {
+          minDist = dist;
+          nearestPoint = { x: checkX, y: checkY };
+        }
+      }
+    }
+  }
+  
+  return nearestPoint;
+};
 export const EditorPage = () => {
   const navigate = useNavigate();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -42,6 +101,7 @@ export const EditorPage = () => {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1);
   const [currentDesignId, setCurrentDesignId] = useState<string | null>(null);
+  const [edgeMap, setEdgeMap] = useState<boolean[][] | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -74,17 +134,32 @@ export const EditorPage = () => {
   const handlePolygonClick = (options: any) => {
     if (!fabricCanvas || activeTool !== "polygon") return;
     const pointer = fabricCanvas.getPointer(options.e);
+    
+    let finalX = pointer.x;
+    let finalY = pointer.y;
+    
+    // Snap to nearest edge if edge detection is available
+    if (edgeMap) {
+      const nearestEdge = findNearestEdge(pointer.x, pointer.y, edgeMap, 20);
+      if (nearestEdge) {
+        finalX = nearestEdge.x;
+        finalY = nearestEdge.y;
+      }
+    }
+    
     const newPoints = [...polygonPoints, {
-      x: pointer.x,
-      y: pointer.y
+      x: finalX,
+      y: finalY
     }];
 
     // Add circle marker at point
     const circle = new Circle({
-      left: pointer.x - 3,
-      top: pointer.y - 3,
-      radius: 3,
-      fill: "red",
+      left: finalX - 4,
+      top: finalY - 4,
+      radius: 4,
+      fill: "#00ff00",
+      stroke: "#ffffff",
+      strokeWidth: 2,
       selectable: false,
       evented: false
     });
@@ -98,7 +173,7 @@ export const EditorPage = () => {
     if (newPoints.length > 1) {
       const polyline = new Polyline(newPoints, {
         stroke: selectedColor,
-        strokeWidth: 2,
+        strokeWidth: 3,
         fill: 'transparent',
         selectable: false,
         evented: false,
@@ -177,7 +252,22 @@ export const EditorPage = () => {
         fabricCanvas.clear();
         fabricCanvas.backgroundImage = img;
         fabricCanvas.renderAll();
-        toast.success("Image uploaded successfully!");
+        
+        // Perform edge detection on uploaded image
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = fabricCanvas.width!;
+        tempCanvas.height = fabricCanvas.height!;
+        const ctx = tempCanvas.getContext('2d');
+        
+        if (ctx) {
+          ctx.drawImage(img.getElement() as HTMLImageElement, 0, 0, tempCanvas.width, tempCanvas.height);
+          const imageData = ctx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+          const edges = detectEdges(imageData);
+          setEdgeMap(edges);
+          toast.success("Image uploaded! Edge detection active - points will snap to edges.");
+        } else {
+          toast.success("Image uploaded successfully!");
+        }
       });
     };
     reader.readAsDataURL(file);
