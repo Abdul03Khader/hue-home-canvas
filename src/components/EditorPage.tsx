@@ -6,6 +6,10 @@ import { Canvas as FabricCanvas, FabricImage, Polygon, Circle, Polyline } from "
 import { Upload, Mouse, Brush, Undo2, Redo2, Download, Save, Home, ZoomIn, ZoomOut, RotateCcw, Palette, Layers } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LayersPanel, type Layer } from "./editor/LayersPanel";
 import { HistoryPanel, type HistoryEntry } from "./editor/HistoryPanel";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,6 +46,11 @@ export const EditorPage = () => {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1);
   const [currentDesignId, setCurrentDesignId] = useState<string | null>(null);
+  const [showSelectionDialog, setShowSelectionDialog] = useState(false);
+  const [pendingPolygon, setPendingPolygon] = useState<Polygon | null>(null);
+  const [selectionName, setSelectionName] = useState("");
+  const [selectionGroup, setSelectionGroup] = useState<string>("new");
+  const [dialogColor, setDialogColor] = useState(selectedColor);
   const fileInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -133,21 +142,14 @@ export const EditorPage = () => {
       stroke: selectedColor,
       strokeWidth: 2
     });
-    const layerId = Date.now().toString();
-    polygon.set('layerId', layerId);
-    fabricCanvas.add(polygon);
+    
+    // Store polygon temporarily and show dialog
+    setPendingPolygon(polygon);
+    setSelectionName(`Selection ${layers.length + 1}`);
+    setDialogColor(selectedColor);
+    setShowSelectionDialog(true);
 
-    // Add to layers
-    const newLayer: Layer = {
-      id: layerId,
-      name: `Selection ${layers.length + 1}`,
-      color: selectedColor,
-      visible: true,
-      fabricObject: polygon
-    };
-    setLayers([...layers, newLayer]);
-
-    // Clear preview objects efficiently
+    // Clear preview objects
     if (previewPolyline) {
       fabricCanvas.remove(previewPolyline);
       setPreviewPolyline(null);
@@ -156,8 +158,44 @@ export const EditorPage = () => {
     setPreviewCircles([]);
     setPolygonPoints([]);
     setIsDrawingPolygon(false);
+  };
+
+  const finalizeSelection = () => {
+    if (!fabricCanvas || !pendingPolygon) return;
+
+    // Update polygon with chosen color
+    pendingPolygon.set({
+      fill: dialogColor,
+      stroke: dialogColor,
+      opacity: 0.6,
+      strokeWidth: 2
+    });
+
+    const layerId = Date.now().toString();
+    pendingPolygon.set('layerId', layerId);
+    pendingPolygon.set('groupId', selectionGroup === "new" ? layerId : selectionGroup);
+    
+    fabricCanvas.add(pendingPolygon);
+
+    // Add to layers
+    const newLayer: Layer = {
+      id: layerId,
+      name: selectionName || `Selection ${layers.length + 1}`,
+      color: dialogColor,
+      visible: true,
+      fabricObject: pendingPolygon,
+      groupId: selectionGroup === "new" ? undefined : selectionGroup
+    };
+    setLayers([...layers, newLayer]);
+
     addToHistory(`Created ${newLayer.name}`);
-    toast.success("Area selected! Color applied.");
+    toast.success("Selection created!");
+
+    // Reset dialog state
+    setShowSelectionDialog(false);
+    setPendingPolygon(null);
+    setSelectionName("");
+    setSelectionGroup("new");
   };
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -327,7 +365,104 @@ export const EditorPage = () => {
       toast.error("Failed to save design");
     }
   };
+  // Get unique groups for dropdown
+  const uniqueGroups = Array.from(new Set(layers.map(l => l.groupId || l.id).filter(Boolean)));
+
   return <div className="min-h-screen bg-background">
+      {/* Selection Dialog */}
+      <Dialog open={showSelectionDialog} onOpenChange={setShowSelectionDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Configure Selection</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 overflow-auto flex-1">
+            <div className="space-y-2">
+              <Label htmlFor="selection-name">Selection Name/Number</Label>
+              <Input
+                id="selection-name"
+                placeholder="e.g., Wall 1, Ceiling, Room A"
+                value={selectionName}
+                onChange={(e) => setSelectionName(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="selection-group">Add to Group</Label>
+              <Select value={selectionGroup} onValueChange={setSelectionGroup}>
+                <SelectTrigger id="selection-group">
+                  <SelectValue placeholder="Create new group" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="new">Create New Group</SelectItem>
+                  {uniqueGroups.map((groupId) => {
+                    const groupLayer = layers.find(l => l.id === groupId || l.groupId === groupId);
+                    return (
+                      <SelectItem key={groupId} value={groupId}>
+                        {groupLayer?.name || `Group ${groupId.slice(0, 8)}`}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Select Color</Label>
+              <ScrollArea className="h-[300px] border rounded-lg p-2">
+                <div className="space-y-2">
+                  {colors.map((color, index) => {
+                    const hexColor = rgbToHex(color.colorValue);
+                    return (
+                      <button
+                        key={`dialog-${color.colorCode}-${index}`}
+                        onClick={() => setDialogColor(hexColor)}
+                        className={`w-full p-3 rounded-lg border-2 transition-all hover:scale-105 flex items-center gap-3 ${
+                          dialogColor === hexColor
+                            ? "border-primary bg-primary/10"
+                            : "border-border hover:border-primary/50"
+                        }`}
+                      >
+                        <div
+                          className="w-10 h-10 rounded-md shadow-md border border-border flex-shrink-0"
+                          style={{ backgroundColor: hexColor }}
+                        />
+                        <div className="text-left flex-1 min-w-0">
+                          <div className="font-medium text-sm truncate">{color.colorName}</div>
+                          <div className="text-xs text-muted-foreground">{color.colorCode}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-4 border-t">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => {
+                setShowSelectionDialog(false);
+                setPendingPolygon(null);
+                setSelectionName("");
+                setSelectionGroup("new");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="default"
+              className="flex-1"
+              onClick={finalizeSelection}
+            >
+              Create Selection
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Header */}
       <header className="border-b border-border bg-card">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">

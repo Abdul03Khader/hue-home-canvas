@@ -9,6 +9,7 @@ export interface Layer {
   color: string;
   visible: boolean;
   fabricObject: any;
+  groupId?: string;
 }
 
 interface LayersPanelProps {
