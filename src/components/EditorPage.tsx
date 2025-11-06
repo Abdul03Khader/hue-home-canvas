@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Canvas as FabricCanvas, FabricImage, Polygon, Circle, Polyline } from "fabric";
 import { Upload, Mouse, Brush, Undo2, Redo2, Download, Save, Home, ZoomIn, ZoomOut, RotateCcw, Palette, Layers } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -118,13 +119,16 @@ export const EditorPage = () => {
     }
     setPolygonPoints(newPoints);
   };
-  const addToHistory = (action: string) => {
+  const addToHistory = (action: string, layersSnapshot?: Layer[]) => {
     if (!fabricCanvas) return;
     const newEntry: HistoryEntry = {
       id: Date.now().toString(),
       action,
       timestamp: new Date(),
-      canvasData: fabricCanvas.toJSON()
+      canvasData: {
+        canvas: fabricCanvas.toJSON(),
+        layers: layersSnapshot || layers
+      }
     };
     const newHistory = history.slice(0, currentHistoryIndex + 1);
     newHistory.push(newEntry);
@@ -186,9 +190,10 @@ export const EditorPage = () => {
       fabricObject: pendingPolygon,
       groupId: selectionGroup === "new" ? undefined : selectionGroup
     };
-    setLayers([...layers, newLayer]);
 
-    addToHistory(`Created ${newLayer.name}`);
+    const newLayers = [...layers, newLayer];
+    setLayers(newLayers);
+    addToHistory(`Created ${newLayer.name}`, newLayers);
     toast.success("Selection created!");
 
     // Reset dialog state
@@ -225,8 +230,9 @@ export const EditorPage = () => {
     const layer = layers.find(l => l.id === layerId);
     if (layer && layer.fabricObject) {
       fabricCanvas.remove(layer.fabricObject);
-      setLayers(layers.filter(l => l.id !== layerId));
-      addToHistory(`Deleted ${layer.name}`);
+      const newLayers = layers.filter(l => l.id !== layerId);
+      setLayers(newLayers);
+      addToHistory(`Deleted ${layer.name}`, newLayers);
       toast.success("Layer deleted");
     }
   };
@@ -299,30 +305,30 @@ export const EditorPage = () => {
     };
 
     const remainingLayers = layers.filter(l => !l.selected);
-    setLayers([...remainingLayers, newLayer]);
+    const newLayers = [...remainingLayers, newLayer];
+    setLayers(newLayers);
 
-    addToHistory(`Merged ${selectedLayers.length} layers`);
+    addToHistory(`Merged ${selectedLayers.length} layers`, newLayers);
     toast.success("Layers merged successfully!");
   };
   const handleRestoreHistory = (index: number) => {
     if (!fabricCanvas || !history[index]) return;
-    fabricCanvas.loadFromJSON(history[index].canvasData, () => {
+    const historyEntry = history[index];
+    
+    fabricCanvas.loadFromJSON(historyEntry.canvasData.canvas, () => {
       fabricCanvas.renderAll();
       setCurrentHistoryIndex(index);
-      // Rebuild layers from canvas objects
-      const newLayers: Layer[] = [];
-      fabricCanvas.getObjects().forEach(obj => {
-        if (obj.get('layerId')) {
-          newLayers.push({
-            id: obj.get('layerId') as string,
-            name: `Selection ${newLayers.length + 1}`,
-            color: obj.get('fill') as string || selectedColor,
-            visible: obj.visible || true,
-            fabricObject: obj
-          });
-        }
+      
+      // Restore layers from history
+      const restoredLayers = historyEntry.canvasData.layers.map((layer: Layer) => {
+        const fabricObject = fabricCanvas.getObjects().find(obj => obj.get('layerId') === layer.id);
+        return {
+          ...layer,
+          fabricObject: fabricObject || layer.fabricObject
+        };
       });
-      setLayers(newLayers);
+      
+      setLayers(restoredLayers);
       toast.success("History restored");
     });
   };
@@ -587,17 +593,44 @@ export const EditorPage = () => {
             <ZoomOut className="h-5 w-5" />
           </Button>
 
-          <Button variant="ghost" size="icon" onClick={handleReset} title="Reset View">
-            <RotateCcw className="h-5 w-5" />
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={handleReset}>
+                  <RotateCcw className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>Reset View</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
 
-          <Button variant="ghost" size="icon" onClick={handleUndo} title="Undo" disabled={currentHistoryIndex <= 0}>
-            <Undo2 className="h-5 w-5" />
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={handleUndo} disabled={currentHistoryIndex <= 0}>
+                  <Undo2 className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>Undo</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
 
-          <Button variant="ghost" size="icon" onClick={handleRedo} title="Redo" disabled={currentHistoryIndex >= history.length - 1}>
-            <Redo2 className="h-5 w-5" />
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={handleRedo} disabled={currentHistoryIndex >= history.length - 1}>
+                  <Redo2 className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>Redo</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </aside>
 
         {/* Main Canvas */}
