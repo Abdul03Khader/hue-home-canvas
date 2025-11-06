@@ -240,6 +240,70 @@ export const EditorPage = () => {
       fabricCanvas.renderAll();
     }
   };
+
+  const handleToggleSelection = (layerId: string) => {
+    setLayers(layers.map(l => 
+      l.id === layerId ? { ...l, selected: !l.selected } : l
+    ));
+  };
+
+  const handleMergeSelected = () => {
+    if (!fabricCanvas) return;
+    
+    const selectedLayers = layers.filter(l => l.selected);
+    if (selectedLayers.length < 2) {
+      toast.error("Select at least 2 layers to merge");
+      return;
+    }
+
+    // Collect all points from selected polygons
+    const allPoints: { x: number; y: number }[] = [];
+    selectedLayers.forEach(layer => {
+      if (layer.fabricObject && layer.fabricObject.points) {
+        layer.fabricObject.points.forEach((point: any) => {
+          allPoints.push({ x: point.x, y: point.y });
+        });
+      }
+    });
+
+    if (allPoints.length === 0) {
+      toast.error("No valid polygons to merge");
+      return;
+    }
+
+    // Create merged polygon with first layer's color
+    const mergedPolygon = new Polygon(allPoints, {
+      fill: selectedLayers[0].color,
+      opacity: 0.6,
+      stroke: selectedLayers[0].color,
+      strokeWidth: 2
+    });
+
+    const layerId = Date.now().toString();
+    mergedPolygon.set('layerId', layerId);
+
+    // Remove old polygons and add merged one
+    selectedLayers.forEach(layer => {
+      fabricCanvas.remove(layer.fabricObject);
+    });
+    fabricCanvas.add(mergedPolygon);
+
+    // Update layers
+    const newLayer: Layer = {
+      id: layerId,
+      name: `Merged (${selectedLayers.length} layers)`,
+      color: selectedLayers[0].color,
+      visible: true,
+      fabricObject: mergedPolygon,
+      selected: false
+    };
+
+    const remainingLayers = layers.filter(l => !l.selected);
+    setLayers([...remainingLayers, newLayer]);
+
+    addToHistory(`Merged ${selectedLayers.length} layers`);
+    toast.success("Layers merged successfully!");
+  };
   const handleRestoreHistory = (index: number) => {
     if (!fabricCanvas || !history[index]) return;
     fabricCanvas.loadFromJSON(history[index].canvasData, () => {
@@ -600,7 +664,13 @@ export const EditorPage = () => {
             </ScrollArea>
           </div>
 
-          <LayersPanel layers={layers} onDeleteLayer={handleDeleteLayer} onToggleVisibility={handleToggleVisibility} />
+          <LayersPanel 
+            layers={layers} 
+            onDeleteLayer={handleDeleteLayer} 
+            onToggleVisibility={handleToggleVisibility}
+            onToggleSelection={handleToggleSelection}
+            onMergeSelected={handleMergeSelected}
+          />
 
           <HistoryPanel history={history} currentIndex={currentHistoryIndex} onRestore={handleRestoreHistory} />
         </aside>
