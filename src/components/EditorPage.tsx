@@ -262,12 +262,19 @@ export const EditorPage = () => {
       return;
     }
 
-    // Collect all points from selected polygons
+    // Collect all points from selected polygons with absolute coordinates
     const allPoints: { x: number; y: number }[] = [];
     selectedLayers.forEach(layer => {
       if (layer.fabricObject && layer.fabricObject.points) {
+        const left = layer.fabricObject.left || 0;
+        const top = layer.fabricObject.top || 0;
+        
         layer.fabricObject.points.forEach((point: any) => {
-          allPoints.push({ x: point.x, y: point.y });
+          // Convert relative points to absolute coordinates
+          allPoints.push({ 
+            x: point.x + left, 
+            y: point.y + top 
+          });
         });
       }
     });
@@ -282,7 +289,9 @@ export const EditorPage = () => {
       fill: selectedLayers[0].color,
       opacity: 0.6,
       stroke: selectedLayers[0].color,
-      strokeWidth: 2
+      strokeWidth: 2,
+      left: 0,
+      top: 0
     });
 
     const layerId = Date.now().toString();
@@ -293,6 +302,7 @@ export const EditorPage = () => {
       fabricCanvas.remove(layer.fabricObject);
     });
     fabricCanvas.add(mergedPolygon);
+    fabricCanvas.renderAll();
 
     // Update layers
     const newLayer: Layer = {
