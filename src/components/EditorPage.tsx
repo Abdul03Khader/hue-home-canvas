@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Canvas as FabricCanvas, FabricImage, Polygon, Circle, Polyline } from "fabric";
+import { Canvas as FabricCanvas, FabricImage, Polygon, Circle, Polyline, Group } from "fabric";
 import { Upload, Mouse, Brush, Undo2, Redo2, Download, Save, Home, ZoomIn, ZoomOut, RotateCcw, Palette, Layers } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card } from "@/components/ui/card";
@@ -262,46 +262,29 @@ export const EditorPage = () => {
       return;
     }
 
-    // Collect all points from selected polygons with absolute coordinates
-    const allPoints: { x: number; y: number }[] = [];
-    selectedLayers.forEach(layer => {
-      if (layer.fabricObject && layer.fabricObject.points) {
-        const left = layer.fabricObject.left || 0;
-        const top = layer.fabricObject.top || 0;
-        
-        layer.fabricObject.points.forEach((point: any) => {
-          // Convert relative points to absolute coordinates
-          allPoints.push({ 
-            x: point.x + left, 
-            y: point.y + top 
-          });
-        });
-      }
-    });
+    // Collect fabric objects from selected layers
+    const fabricObjects = selectedLayers
+      .map(layer => layer.fabricObject)
+      .filter(obj => obj);
 
-    if (allPoints.length === 0) {
+    if (fabricObjects.length === 0) {
       toast.error("No valid polygons to merge");
       return;
     }
 
-    // Create merged polygon with first layer's color
-    const mergedPolygon = new Polygon(allPoints, {
-      fill: selectedLayers[0].color,
-      opacity: 0.6,
-      stroke: selectedLayers[0].color,
-      strokeWidth: 2,
-      left: 0,
-      top: 0
+    // Create a group with all selected polygons
+    const group = new Group(fabricObjects, {
+      selectable: true
     });
 
     const layerId = Date.now().toString();
-    mergedPolygon.set('layerId', layerId);
+    group.set('layerId', layerId);
 
-    // Remove old polygons and add merged one
+    // Remove old polygons and add group
     selectedLayers.forEach(layer => {
       fabricCanvas.remove(layer.fabricObject);
     });
-    fabricCanvas.add(mergedPolygon);
+    fabricCanvas.add(group);
     fabricCanvas.renderAll();
 
     // Update layers
@@ -310,7 +293,7 @@ export const EditorPage = () => {
       name: `Merged (${selectedLayers.length} layers)`,
       color: selectedLayers[0].color,
       visible: true,
-      fabricObject: mergedPolygon,
+      fabricObject: group,
       selected: false
     };
 
