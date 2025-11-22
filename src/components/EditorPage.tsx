@@ -144,7 +144,9 @@ export const EditorPage = () => {
       fill: selectedColor,
       opacity: 0.6,
       stroke: selectedColor,
-      strokeWidth: 2
+      strokeWidth: 2,
+      selectable: false,
+      evented: false
     });
     
     // Store polygon temporarily and show dialog
@@ -274,7 +276,8 @@ export const EditorPage = () => {
 
     // Create a group with all selected polygons
     const group = new Group(fabricObjects, {
-      selectable: true
+      selectable: false,
+      evented: false
     });
 
     const layerId = Date.now().toString();
