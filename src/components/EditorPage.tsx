@@ -52,6 +52,7 @@ export const EditorPage = () => {
   const [selectionName, setSelectionName] = useState("");
   const [selectionGroup, setSelectionGroup] = useState<string>("new");
   const [dialogColor, setDialogColor] = useState(selectedColor);
+  const [showColorDialog, setShowColorDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -435,6 +436,43 @@ export const EditorPage = () => {
   const uniqueGroups = Array.from(new Set(layers.map(l => l.groupId || l.id).filter(Boolean)));
 
   return <div className="min-h-screen bg-background">
+      {/* Color Selection Dialog */}
+      <Dialog open={showColorDialog} onOpenChange={setShowColorDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Select Color</DialogTitle>
+          </DialogHeader>
+          
+          <ScrollArea className="h-[500px] flex-1">
+            <div className="space-y-2 p-2">
+              {colors.map((color, index) => {
+                const hexColor = rgbToHex(color.colorValue);
+                return (
+                  <button 
+                    key={`color-dialog-${color.colorCode}-${index}`} 
+                    onClick={() => {
+                      setSelectedColor(hexColor);
+                      setShowColorDialog(false);
+                    }} 
+                    className={`w-full p-3 rounded-lg border-2 transition-smooth hover:scale-105 flex items-center gap-3 ${selectedColor === hexColor ? "border-primary shadow-glow" : "border-border hover:border-primary/50"}`}
+                  >
+                    <div 
+                      className="w-10 h-10 rounded-md shadow-md border border-border flex-shrink-0" 
+                      style={{ backgroundColor: hexColor }} 
+                    />
+                    <div className="text-left flex-1 min-w-0">
+                      <div className="font-medium text-sm truncate">{color.colorName}</div>
+                      <div className="text-xs text-muted-foreground">{color.colorCode}</div>
+                      <div className="text-xs text-muted-foreground">{color.colorTone}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
       {/* Selection Dialog */}
       <Dialog open={showSelectionDialog} onOpenChange={setShowSelectionDialog}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
@@ -662,35 +700,29 @@ export const EditorPage = () => {
         {/* Right Sidebar - Color Palette & Layers */}
         <aside className="w-80 border-l border-border bg-card p-6 flex flex-col gap-4">
           <div>
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Palette className="h-5 w-5 text-primary" />
-              All Colors
-            </h2>
-          
-            <ScrollArea className="h-[300px]">
-              <div className="space-y-2">
-                {colors.map((color, index) => {
-                  const hexColor = rgbToHex(color.colorValue);
-                  return (
-                    <button 
-                      key={`${color.colorCode}-${index}`} 
-                      onClick={() => setSelectedColor(hexColor)} 
-                      className={`w-full p-3 rounded-lg border-2 transition-smooth hover:scale-105 flex items-center gap-3 ${selectedColor === hexColor ? "border-primary shadow-glow" : "border-border hover:border-primary/50"}`}
-                    >
-                      <div 
-                        className="w-10 h-10 rounded-md shadow-md border border-border" 
-                        style={{ backgroundColor: hexColor }} 
-                      />
-                      <div className="text-left flex-1">
-                        <div className="font-medium text-sm">{color.colorName}</div>
-                        <div className="text-xs text-muted-foreground">{color.colorCode}</div>
-                        <div className="text-xs text-muted-foreground">{color.colorTone}</div>
-                      </div>
-                    </button>
-                  );
-                })}
+            <Button 
+              variant="default" 
+              className="w-full" 
+              onClick={() => setShowColorDialog(true)}
+            >
+              <Palette className="h-5 w-5 mr-2" />
+              Colors
+            </Button>
+            
+            {selectedColor && (
+              <div className="mt-4 p-3 rounded-lg border-2 border-primary bg-primary/10">
+                <div className="text-sm font-medium mb-2">Selected Color</div>
+                <div className="flex items-center gap-3">
+                  <div 
+                    className="w-12 h-12 rounded-md shadow-md border border-border" 
+                    style={{ backgroundColor: selectedColor }} 
+                  />
+                  <div className="flex-1 text-sm text-muted-foreground">
+                    {colors.find(c => rgbToHex(c.colorValue) === selectedColor)?.colorName || 'Custom'}
+                  </div>
+                </div>
               </div>
-            </ScrollArea>
+            )}
           </div>
 
           <LayersPanel 
